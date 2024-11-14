@@ -743,6 +743,65 @@ message Lease {
   uint64 term = 10;
 }
 
+message Lease_24_1 {
+  option (gogoproto.populate) = true;
+
+  // The start is a timestamp at which the lease begins. This value
+  // must be greater than the last lease expiration or the lease request
+  // is considered invalid.
+  util.hlc.Timestamp start = 1 [(gogoproto.nullable) = false,
+    (gogoproto.casttype) = "github.com/cockroachdb/cockroach/pkg/util/hlc.ClockTimestamp"];
+
+  // The expiration is a timestamp at which the lease expires. This means that a
+  // new lease can be granted for a later timestamp. This field is only set for
+  // expiration-based leases.
+  util.hlc.Timestamp expiration = 2;
+
+  // The address of the would-be lease holder.
+  ReplicaDescriptor replica = 3 [(gogoproto.nullable) = false];
+
+  // The start of the lease stasis period. This field is deprecated.
+  //
+  // TODO(erikgrinaker): remove this. Migration:
+  //
+  // - 2016: the field was deprecated (#10305).
+  //
+  // - 24.1: stop reading the field. 23.2 nodes compare the field below Raft in
+  //   Lease.Equal(), so we must populate the field for backwards compatibility.
+  //
+  // - 24.2 or later: remove the field when backwards compatibility with 23.2
+  //   is no longer needed.
+  util.hlc.Timestamp deprecated_start_stasis = 4;
+
+  // The current timestamp when this lease has been proposed. Used after a
+  // transfer and after a node restart to enforce that a node only uses leases
+  // proposed after the time of the said transfer or restart. This is nullable
+  // to help with the rollout (such that a lease applied by some nodes before
+  // the rollout and some nodes after the rollout is serialized the same).
+  // TODO(andrei): Make this non-nullable after the rollout.
+  util.hlc.Timestamp proposed_ts  = 5 [(gogoproto.customname) = "ProposedTS",
+    (gogoproto.casttype) = "github.com/cockroachdb/cockroach/pkg/util/hlc.ClockTimestamp"];
+
+  // The epoch of the lease holder's node liveness entry. If this value is
+  // non-zero, the expiration field is ignored.
+  int64 epoch = 6;
+
+  // A zero-indexed sequence number which is incremented during the acquisition
+  // of each new range lease that is not equivalent to the previous range lease
+  // (i.e. an acquisition that implies a leaseholder change). The sequence
+  // number is used to detect lease changes between command proposal and
+  // application without requiring that we send the entire lease through Raft.
+  // Lease sequence numbers are a reflection of the "lease equivalency" property
+  // (see Lease.Equivalent). Two adjacent leases that are equivalent will have
+  // the same sequence number and two adjacent leases that are not equivalent
+  // will have different sequence numbers.
+  uint64 sequence = 7 [(gogoproto.casttype) = "LeaseSequence"];
+
+  // The type of acquisition event that result in this lease (transfer or
+  // request).
+  LeaseAcquisitionType acquisition_type = 8;
+}
+
 // AbortSpanEntry contains information about a transaction which has
 // been aborted. It's written to a range's AbortSpan if the range
 // may have contained intents of the aborted txn. In the event that

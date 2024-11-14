@@ -59,6 +59,7 @@ go_test(
     size = "small",
     srcs = [
         "data_test.go",
+        "equiv_test.go",
         "index_usage_stats_test.go",
         "key_test.go",
         "main_test.go",
